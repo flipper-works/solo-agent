@@ -8,6 +8,7 @@ from agent.core.observer import Observation, Observer, Verdict
 from agent.core.planner import Planner
 from agent.infra.logger import get_logger
 from agent.llm.base import BaseLLM
+from agent.memory.manager import MemoryManager
 from agent.tools.base import BaseTool
 
 log = get_logger(__name__)
@@ -27,6 +28,7 @@ class AgentSession:
         llm: BaseLLM,
         tools: list[BaseTool],
         max_iterations: int = 3,
+        memory: MemoryManager | None = None,
     ) -> None:
         self.llm = llm
         self.tools = tools
@@ -34,14 +36,26 @@ class AgentSession:
         self.planner = Planner(llm, tools)
         self.executor = Executor(tools)
         self.observer = Observer(llm)
+        self.memory = memory
 
     async def run(self, task: str) -> SessionResult:
         history: list[str] = []
         trace: ExecutionTrace = ExecutionTrace()
         obs: Observation | None = None
         log.info("session_start", task=task, max_iterations=self.max_iterations)
+        # L3 retrieval (transparent injection)
+        memory_context = ""
+        if self.memory is not None:
+            memory_context = self.memory.retrieve_context(task, top_k=3)
+            if memory_context:
+                log.info("memory_retrieved", chars=len(memory_context))
+            self.memory.add_turn("user", task)
         for i in range(1, self.max_iterations + 1):
             prior = "\n\n".join(history) if history else ""
+            if memory_context:
+                prior = (
+                    f"# 関連する過去の記憶\n{memory_context}\n\n{prior}".rstrip()
+                )
             log.info("plan_start", iteration=i)
             plan = await self.planner.plan(task, prior_context=prior)
             log.info("plan_done", iteration=i, steps=len(plan.steps))
@@ -59,9 +73,11 @@ class AgentSession:
             log.info("observation", iteration=i, verdict=obs.verdict.value, summary=obs.summary)
             if obs.verdict == Verdict.DONE:
                 log.info("session_end", verdict="done", iterations=i)
+                self._record(task, "done", obs.summary, i)
                 return SessionResult(Verdict.DONE, i, trace, obs)
             if obs.verdict == Verdict.FAIL:
                 log.warning("session_end", verdict="fail", iterations=i)
+                self._record(task, "fail", obs.summary, i)
                 return SessionResult(Verdict.FAIL, i, trace, obs)
             # build history snippet for next planner round
             lines = [f"## 試行{i}"]
@@ -77,4 +93,10 @@ class AgentSession:
             history.append("\n".join(lines))
         assert obs is not None
         log.warning("session_end", verdict=obs.verdict.value, iterations=self.max_iterations)
+        self._record(task, obs.verdict.value, obs.summary, self.max_iterations)
         return SessionResult(obs.verdict, self.max_iterations, trace, obs)
+
+    def _record(self, task: str, verdict: str, summary: str, iterations: int) -> None:
+        if self.memory is not None:
+            self.memory.record_episode(task, verdict, summary, iterations)
+            self.memory.add_turn("assistant", f"[{verdict}] {summary}")

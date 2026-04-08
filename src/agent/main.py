@@ -14,6 +14,7 @@ from agent.core.session import AgentSession
 from agent.infra.logger import configure_logging
 from agent.llm.base import Message
 from agent.llm.ollama_client import OllamaClient
+from agent.memory.manager import MemoryManager
 from agent.tools.code_executor import CodeExecutor
 from agent.tools.file_ops import FileOps
 from agent.tools.shell_runner import ShellRunner
@@ -98,16 +99,18 @@ def run(
     task: str = typer.Argument(..., help="エージェントに実行させたいタスク"),
     model: str = typer.Option("gemma3:12b", "--model", "-m"),
     max_iter: int = typer.Option(3, "--max-iter"),
+    no_memory: bool = typer.Option(False, "--no-memory", help="メモリ層を無効化"),
 ) -> None:
     """Plan→Execute→Observe ループでタスクを自律実行。"""
-    asyncio.run(_run(task, model, max_iter))
+    asyncio.run(_run(task, model, max_iter, no_memory))
 
 
-async def _run(task: str, model: str, max_iter: int) -> None:
+async def _run(task: str, model: str, max_iter: int, no_memory: bool) -> None:
     configure_logging(level="INFO", log_file=Path("logs/agent.jsonl"))
     llm = OllamaClient(model=model)
     tools = [ShellRunner(), FileOps(), CodeExecutor()]
-    session = AgentSession(llm, tools, max_iterations=max_iter)
+    memory = None if no_memory else MemoryManager()
+    session = AgentSession(llm, tools, max_iterations=max_iter, memory=memory)
     console.print(f"[bold cyan]task:[/bold cyan] {task}")
     result = await session.run(task)
     console.print(f"\n[bold]verdict:[/bold] {result.verdict.value}  iterations={result.iterations}")
@@ -120,6 +123,16 @@ async def _run(task: str, model: str, max_iter: int) -> None:
             console.print(f"   [dim]out:[/dim] {rec.result.output[:300]}")
         if rec.result.error:
             console.print(f"   [red]err:[/red] {rec.result.error[:300]}")
+
+
+@app.command()
+def stats() -> None:
+    """メモリ層の統計を表示。"""
+    mm = MemoryManager()
+    s = mm.stats()
+    console.print("[bold cyan]memory stats[/bold cyan]")
+    for k, v in s.items():
+        console.print(f"  {k}: {v}")
 
 
 def main() -> None:
