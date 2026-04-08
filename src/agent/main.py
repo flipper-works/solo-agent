@@ -109,7 +109,7 @@ async def _run(task: str, model: str, max_iter: int, no_memory: bool) -> None:
     configure_logging(level="INFO", log_file=Path("logs/agent.jsonl"))
     llm = OllamaClient(model=model)
     tools = [ShellRunner(), FileOps(), CodeExecutor()]
-    memory = None if no_memory else MemoryManager()
+    memory = None if no_memory else MemoryManager(llm_for_summary=llm)
     session = AgentSession(llm, tools, max_iterations=max_iter, memory=memory)
     console.print(f"[bold cyan]task:[/bold cyan] {task}")
     result = await session.run(task)
