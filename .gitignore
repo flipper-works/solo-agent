@@ -1,0 +1,59 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+wheels/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Virtual env ---
+.venv/
+venv/
+env/
+
+# --- Secrets / env ---
+.env
+.env.*
+!.env.example
+secrets/
+*.key
+*.pem
+credentials.json
+
+# --- Model weights (do NOT redistribute Llama/Gemma derivatives) ---
+models/
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.pth
+
+# --- Runtime data ---
+logs/
+data/
+tmp/
+*.log
+*.jsonl
+
+# --- ChromaDB / SQLite ---
+*.sqlite
+*.sqlite3
+*.db
+chroma_db/
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Tool-local ---
+.claude/
