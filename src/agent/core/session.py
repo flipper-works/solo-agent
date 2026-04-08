@@ -49,7 +49,7 @@ class AgentSession:
             memory_context = self.memory.retrieve_context(task, top_k=3)
             if memory_context:
                 log.info("memory_retrieved", chars=len(memory_context))
-            self.memory.add_turn("user", task)
+            await self.memory.add_turn("user", task)
         for i in range(1, self.max_iterations + 1):
             prior = "\n\n".join(history) if history else ""
             if memory_context:
@@ -73,11 +73,11 @@ class AgentSession:
             log.info("observation", iteration=i, verdict=obs.verdict.value, summary=obs.summary)
             if obs.verdict == Verdict.DONE:
                 log.info("session_end", verdict="done", iterations=i)
-                self._record(task, "done", obs.summary, i)
+                await self._record(task, "done", obs.summary, i)
                 return SessionResult(Verdict.DONE, i, trace, obs)
             if obs.verdict == Verdict.FAIL:
                 log.warning("session_end", verdict="fail", iterations=i)
-                self._record(task, "fail", obs.summary, i)
+                await self._record(task, "fail", obs.summary, i)
                 return SessionResult(Verdict.FAIL, i, trace, obs)
             # build history snippet for next planner round
             lines = [f"## 試行{i}"]
@@ -93,10 +93,10 @@ class AgentSession:
             history.append("\n".join(lines))
         assert obs is not None
         log.warning("session_end", verdict=obs.verdict.value, iterations=self.max_iterations)
-        self._record(task, obs.verdict.value, obs.summary, self.max_iterations)
+        await self._record(task, obs.verdict.value, obs.summary, self.max_iterations)
         return SessionResult(obs.verdict, self.max_iterations, trace, obs)
 
-    def _record(self, task: str, verdict: str, summary: str, iterations: int) -> None:
+    async def _record(self, task: str, verdict: str, summary: str, iterations: int) -> None:
         if self.memory is not None:
             self.memory.record_episode(task, verdict, summary, iterations)
-            self.memory.add_turn("assistant", f"[{verdict}] {summary}")
+            await self.memory.add_turn("assistant", f"[{verdict}] {summary}")
