@@ -2545,20 +2545,52 @@ Phase 3 完了: v1.0.0  ← 全モーダル対応・安定版
 
 ---
 
-### 21.1 ブランチ保護ルール
+### 21.1 ブランチ戦略 (GitHub Flow)
+
+ソロ開発のpublicリポジトリのため、**GitHub Flow** を採用する (Git Flow より軽量)。
 
 ```
 main
-  ├── 直接コミット禁止
-  ├── develop からのマージのみ許可
-  ├── マージ前に CI (lint + unit + integration) 通過必須
-  └── マージ後は必ずバージョンタグを打つ
+  ├── 常に動作する状態を維持する (CI green)
+  ├── 直接コミット禁止 (作業ブランチからのPRマージのみ)
+  ├── マージ前に CI (lint + unit) 通過必須
+  └── フェーズ完了時にバージョンタグを打つ
 
-develop
-  ├── feature/* / fix/* / refactor/* / chore/* / docs/* からのマージのみ
-  ├── マージ前に unit テスト通過必須
-  └── 作業ブランチは完了後に削除する
+作業ブランチ (用途別プレフィックス)
+  feat/<topic>     新機能           例: feat/phase2-memory
+  fix/<topic>      バグ修正         例: fix/planner-json-parse
+  refactor/<topic> リファクタ        例: refactor/tool-registry
+  chore/<topic>    依存更新・雑務    例: chore/upgrade-pydantic
+  docs/<topic>     ドキュメントのみ  例: docs/update-roadmap
 ```
+
+**運用フロー** (1機能 = 1ブランチ = 1PR):
+
+```bash
+# 1. mainから分岐
+git switch main && git pull
+git switch -c feat/phase2-memory
+
+# 2. 作業 → コミット (Conventional Commits)
+git add ...
+git commit -m "feat(memory): add ChromaDB long-term store"
+
+# 3. push → PR作成
+git push -u origin feat/phase2-memory
+gh pr create --fill
+
+# 4. self-review → squash merge
+gh pr merge --squash --delete-branch
+
+# 5. ローカル同期
+git switch main && git pull
+```
+
+**ポイント**:
+- `develop` ブランチは作らない (二重管理を避ける)
+- 作業ブランチは PR マージ後すぐ削除する
+- 1日以上残るブランチは存在しないのが理想 (短命ブランチ)
+- 緊急のtypo修正等は main 直接コミットも例外として許容
 
 ---
 
@@ -2578,14 +2610,17 @@ fix
 asdfasdf
 ```
 
-**作業中の細かいコミットは `rebase -i` で整理してからマージする。**
+**作業中の細かいコミットは `rebase -i` または PR の squash merge で整理する。**
 
 ```bash
-# マージ前に履歴を整理する手順
-git rebase -i develop          # develop との差分を対話的に整理
+# 方法A: マージ前にローカルで整理
+git rebase -i main             # main との差分を対話的に整理
 # → squash / fixup で細かいコミットをまとめる
 # → reword でメッセージを Conventional Commits 形式に修正
 git push --force-with-lease    # force push は --force-with-lease のみ許可
+
+# 方法B: PR で squash merge する (推奨・楽)
+gh pr merge --squash --delete-branch
 ```
 
 ---
@@ -2640,11 +2675,11 @@ Thumbs.db
 ### 21.4 タグ・リリース管理
 
 ```bash
-# フェーズ完了時のリリース手順
-git checkout main
-git merge develop --no-ff -m "release: v0.1.0 — Phase 1 完了"
+# フェーズ完了時のリリース手順 (GitHub Flow)
+git switch main && git pull
 git tag -a v0.1.0 -m "Phase 1: Ollama + CLI エージェント基盤"
-git push origin main --tags
+git push origin v0.1.0
+gh release create v0.1.0 --notes-file CHANGELOG_v0.1.0.md  # 任意
 
 # タグ命名規則
 v0.1.0   # Phase 1 完了
