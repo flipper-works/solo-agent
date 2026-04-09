@@ -12,6 +12,7 @@ from pathlib import Path
 
 from agent.core.session import AgentSession
 from agent.infra.logger import configure_logging
+from agent.input.vision_adapter import VisionAdapter
 from agent.llm.base import Message
 from agent.llm.ollama_client import OllamaClient
 from agent.memory.manager import MemoryManager
@@ -123,6 +124,29 @@ async def _run(task: str, model: str, max_iter: int, no_memory: bool) -> None:
             console.print(f"   [dim]out:[/dim] {rec.result.output[:300]}")
         if rec.result.error:
             console.print(f"   [red]err:[/red] {rec.result.error[:300]}")
+
+
+@app.command()
+def vision(
+    image: Path = typer.Argument(..., help="画像ファイルへのパス"),
+    model: str = typer.Option("gemma3:12b", "--model", "-m", help="マルチモーダルモデル"),
+    prompt: str = typer.Option(
+        "", "--prompt", "-p", help="カスタムプロンプト (省略時はデフォルト記述要求)"
+    ),
+) -> None:
+    """画像を Vision LLM にかけてテキスト記述を取得 (Gemma 3 ネイティブビジョン)。"""
+    if not image.exists():
+        console.print(f"[red]ファイルが見つかりません:[/red] {image}")
+        raise typer.Exit(1)
+    asyncio.run(_vision(image, model, prompt))
+
+
+async def _vision(image: Path, model: str, prompt: str) -> None:
+    llm = OllamaClient(model=model)
+    adapter = VisionAdapter(llm, prompt=prompt) if prompt else VisionAdapter(llm)
+    console.print(f"[dim]>>> {model} reading {image.name}[/dim]")
+    text = await adapter.to_text(image)
+    console.print(text)
 
 
 @app.command()
