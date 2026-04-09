@@ -150,6 +150,40 @@ async def _vision(image: Path, model: str, prompt: str) -> None:
     console.print(text)
 
 
+@app.command("eval-grade")
+def eval_grade(
+    results: Path = typer.Argument(..., help="results.jsonl パス"),
+    out: Path = typer.Option(None, "--out", "-o",
+        help="Markdownレポート出力先 (省略時は標準出力)"),
+    model: str = typer.Option("gemma3:12b", "--model", "-m",
+        help="採点LLMモデル"),
+) -> None:
+    """評価結果ファイルを LLM-as-judge で自動採点。"""
+    if not results.exists():
+        console.print(f"[red]ファイルが見つかりません:[/red] {results}")
+        raise typer.Exit(1)
+    asyncio.run(_eval_grade(results, out, model))
+
+
+async def _eval_grade(results: Path, out: Path | None, model: str) -> None:
+    from agent.eval.grader import Grader, render_markdown
+
+    grader = Grader(OllamaClient(model=model))
+    console.print(f"[dim]>>> grading {results.name} with {model}[/dim]")
+    report = await grader.grade_file(results)
+    md = render_markdown(report)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(md, encoding="utf-8")
+        console.print(f"[green]wrote → {out}[/green]")
+    else:
+        console.print(md)
+    console.print(
+        f"\n[bold]Total: {report.total_score}/{report.max_score} "
+        f"({100 * report.total_score / max(1, report.max_score):.1f}%)[/bold]"
+    )
+
+
 @app.command("eval-chat")
 def eval_chat(
     scenarios: Path = typer.Option(
