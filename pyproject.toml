@@ -20,6 +20,7 @@ dependencies = [
     "rich>=14.3.3",
     "structlog>=25.5.0",
     "typer>=0.24.1",
+    "unsloth[cu124-torch260]>=2025.2.2",
 ]
 
 [project.scripts]
