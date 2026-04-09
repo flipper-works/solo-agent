@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from agent.core.planner import Plan, PlanStep
+from agent.infra.safety import SafetyViolation, check_step
 from agent.tools.base import BaseTool, ToolResult
 
 
@@ -35,6 +36,16 @@ class Executor:
                     StepRecord(
                         step=step,
                         result=ToolResult(ok=False, error=f"unknown tool: {step.tool}"),
+                    )
+                )
+                break
+            try:
+                check_step(step.tool, step.args)
+            except SafetyViolation as e:
+                trace.records.append(
+                    StepRecord(
+                        step=step,
+                        result=ToolResult(ok=False, error=f"SafetyViolation: {e}"),
                     )
                 )
                 break

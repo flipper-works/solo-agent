@@ -67,14 +67,28 @@ class Planner:
             "あなたはローカルLLMエージェントのPlannerです。\n"
             "ユーザーのタスクを、以下のツールだけを使った実行ステップに分解してください。\n\n"
             f"利用可能なツール (JSON Schema):\n{json.dumps(schemas, ensure_ascii=False, indent=2)}\n\n"
-            "出力ルール:\n"
-            "1. 必ず以下の形式のJSONのみを出力してください。前後の説明文・コードフェンスは禁止。\n"
+            "## 出力ルール (厳守)\n"
+            "1. 必ず以下の形式のJSONのみを出力してください。前後の説明文・コードフェンス・自然文は一切禁止。\n"
             '2. 形式: {"steps": [{"tool": "<name>", "args": {...}, "reason": "<短い日本語の理由>"}, ...]}\n'
             "3. 各 args は対応するツールの parameters スキーマに従うこと。\n"
             "4. 不要なステップは含めない。最小ステップで達成すること。\n"
+            "5. JSON文字列内の改行は必ず \\n でエスケープ、ダブルクォートは \\\" でエスケープすること。\n"
+            "6. ステップ間でデータを渡す必要がある場合は、code_executor 内で完結させる (シェル変数 $LAST_RESULT 等は存在しない)。\n\n"
+            "## 安全性ルール (厳守)\n"
+            "S1. 破壊的コマンド (rm -rf /, rm -rf ., dd if=, mkfs, :(){:|:&};:, シャットダウン系) は絶対に生成しないこと。\n"
+            "S2. 上記のような危険な要求を受けた場合は、空のステップ配列 {\"steps\": []} を返すこと。\n"
+            "S3. パスは /tmp 配下、または明示されたカレントディレクトリ配下に限定する。/ や $HOME の再帰削除は禁止。\n\n"
+            "## 指示遵守ルール\n"
+            "I1. ユーザーの指示の字面を尊重すること。「最初に X を試して、ダメなら Y」のような順序指定があれば、X を必ず先に試行ステップに含める。\n"
+            "I2. ユーザーが意図的に失敗するコードを書けと言ったら、そのまま書く (親切な先回り修正は禁止)。\n"
+            "I3. タスクが空白・空文字列の場合は {\"steps\": []} を返すこと。\n"
+            "I4. タスクが曖昧すぎる場合は最小限の調査ステップ1つに留め、勝手に大規模変更を計画しないこと。\n"
         )
 
     async def plan(self, task: str, prior_context: str = "") -> Plan:
+        # Empty/whitespace-only input guard (avoid Planner LLM call entirely)
+        if not task or not task.strip():
+            return Plan(steps=[])
         user_content = task
         if prior_context:
             user_content = f"{task}\n\n# 前回までの実行履歴\n{prior_context}\n\n上の履歴を踏まえ、未達成部分を達成するための新しい計画を作ってください。同じ失敗を繰り返さないこと。"
