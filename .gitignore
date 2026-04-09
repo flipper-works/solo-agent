@@ -28,7 +28,9 @@ secrets/
 credentials.json
 
 # --- Model weights (do NOT redistribute Llama/Gemma derivatives) ---
-models/
+models/*
+!models/Modelfile.*
+!models/Modelfile.gemma3-sp
 *.gguf
 *.bin
 *.safetensors

@@ -42,7 +42,7 @@ def version() -> None:
 @app.command()
 def ask(
     prompt: str = typer.Argument(..., help="One-shot prompt to send to the LLM"),
-    model: str = typer.Option("gemma3:12b", "--model", "-m"),
+    model: str = typer.Option("gemma3-sp", "--model", "-m"),
 ) -> None:
     """Send a single prompt and stream the response."""
     asyncio.run(_ask(prompt, model))
@@ -61,9 +61,11 @@ async def _ask(prompt: str, model: str) -> None:
 
 @app.command()
 def chat(
-    model: str = typer.Option("gemma3:12b", "--model", "-m"),
+    model: str = typer.Option("gemma3-sp", "--model", "-m"),
     system: str = typer.Option(
-        "あなたは親切なローカルLLMアシスタントです。日本語で簡潔に応答してください。",
+        "あなたは親切で正直なローカルLLMアシスタントです。日本語で簡潔に応答してください。"
+        "コードレビューで問題がなければ「問題ありません」と正直に答えてください。無理に改善点を捏造しないでください。"
+        "知らないことは知らないと素直に答えてください。",
         "--system",
         "-s",
     ),
@@ -99,7 +101,7 @@ async def _chat(model: str, system: str) -> None:
 @app.command()
 def run(
     task: str = typer.Argument(..., help="エージェントに実行させたいタスク"),
-    model: str = typer.Option("gemma3:12b", "--model", "-m"),
+    model: str = typer.Option("gemma3-sp", "--model", "-m"),
     max_iter: int = typer.Option(3, "--max-iter"),
     no_memory: bool = typer.Option(False, "--no-memory", help="メモリ層を無効化"),
 ) -> None:
@@ -130,7 +132,7 @@ async def _run(task: str, model: str, max_iter: int, no_memory: bool) -> None:
 @app.command()
 def vision(
     image: Path = typer.Argument(..., help="画像ファイルへのパス"),
-    model: str = typer.Option("gemma3:12b", "--model", "-m", help="マルチモーダルモデル"),
+    model: str = typer.Option("gemma3-sp", "--model", "-m", help="マルチモーダルモデル"),
     prompt: str = typer.Option(
         "", "--prompt", "-p", help="カスタムプロンプト (省略時はデフォルト記述要求)"
     ),
@@ -162,7 +164,7 @@ def sft_build(
         0, "--augment", "-a",
         help="各curated例から生成するLLM増強バリエーション数 (0=増強しない)"),
     augment_model: str = typer.Option(
-        "gemma3:12b", "--augment-model",
+        "gemma3-sp", "--augment-model",
         help="増強に使うLLMモデル"),
     out_dir: Path = typer.Option(
         Path("data/sft"), "--out", "-o", help="出力先ディレクトリ"),
@@ -233,7 +235,7 @@ def eval_grade(
     results: Path = typer.Argument(..., help="results.jsonl パス"),
     out: Path = typer.Option(None, "--out", "-o",
         help="Markdownレポート出力先 (省略時は標準出力)"),
-    model: str = typer.Option("gemma3:12b", "--model", "-m",
+    model: str = typer.Option("gemma3-sp", "--model", "-m",
         help="採点LLMモデル"),
 ) -> None:
     """評価結果ファイルを LLM-as-judge で自動採点。"""
@@ -268,7 +270,7 @@ def eval_chat(
         Path("evals/tasks/multiturn.yaml"), "--scenarios", "-s"
     ),
     out: Path = typer.Option(Path("evals/results"), "--out", "-o"),
-    model: str = typer.Option("gemma3:12b", "--model", "-m"),
+    model: str = typer.Option("gemma3-sp", "--model", "-m"),
 ) -> None:
     """Multi-turn 会話評価を実行 (`agent chat` の品質測定)。"""
     from agent.eval.multiturn import run_multiturn_eval
@@ -283,7 +285,7 @@ def eval(
         Path("evals/tasks/baseline.yaml"), "--tasks", "-t", help="タスク定義YAML"
     ),
     out: Path = typer.Option(Path("evals/results"), "--out", "-o"),
-    model: str = typer.Option("gemma3:12b", "--model", "-m"),
+    model: str = typer.Option("gemma3-sp", "--model", "-m"),
     max_iter: int = typer.Option(3, "--max-iter"),
 ) -> None:
     """ベースライン評価ハーネスを実行 (FT前の弱点抽出用)。"""

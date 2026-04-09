@@ -23,7 +23,7 @@ class OllamaClient(BaseLLM):
 
     def __init__(
         self,
-        model: str = "gemma3:12b",
+        model: str = "gemma3-sp",
         base_url: str = "http://localhost:11434",
         timeout: float = 600.0,
     ) -> None:
