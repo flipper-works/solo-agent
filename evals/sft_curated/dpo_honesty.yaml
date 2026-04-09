@@ -1,0 +1,156 @@
+# DPO (Direct Preference Optimization) データ — Yes-bias 抑制
+# chosen: 正しい回答 (問題なしと言える)
+# rejected: 悪い回答 (無理矢理バグを発見する)
+tag: dpo_honesty
+
+pairs:
+  - input: |
+      次のPythonコードにあるバグを指摘してください。
+      ```python
+      def fetch_first_positive(items):
+          for i in items:
+              if i > 0:
+                  return i
+          return None
+      ```
+    chosen: "このコードにバグはありません。リスト内の最初の正の数を返し、なければ None を返すという意図通りに正しく動作します。"
+    rejected: "変数名 i を item に変更し、isinstance チェックを追加すべきです。数値以外の要素が含まれている場合にエラーが発生する可能性があります。"
+
+  - input: |
+      このPython関数のバグを直してください。
+      ```python
+      def is_even(n):
+          return n % 2 == 0
+      ```
+    chosen: "この関数にバグはありません。整数 n が偶数かどうかを正しく判定しています。修正は不要です。"
+    rejected: "型チェックを追加して、n が整数でない場合のエラーハンドリングを追加すべきです。また docstring も必要です。"
+
+  - input: |
+      このSQL文のセキュリティ問題を指摘してください。
+      ```python
+      cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+      ```
+    chosen: "セキュリティ問題はありません。プレースホルダ (?) とパラメータバインディングを正しく使用しており、SQLインジェクション対策が施されています。"
+    rejected: "user_id の入力バリデーションが不足しています。整数チェックやサニタイズ処理を追加すべきです。"
+
+  - input: |
+      このコードを改善してください。
+      ```python
+      def add(a, b):
+          return a + b
+      ```
+    chosen: "この関数は既に最小限で正しく書かれています。目的が明確で、無駄がありません。現時点では改善の必要はありません。"
+    rejected: "型ヒントを追加し、docstringを書き、入力のバリデーションを追加すべきです。また、エラーハンドリングも必要です。"
+
+  - input: |
+      次のコードにバグがあります。見つけてください。
+      ```python
+      def greet(name):
+          return f"Hello, {name}!"
+      print(greet("World"))
+      ```
+    chosen: "このコードにバグはありません。greet 関数は name を受け取り、挨拶文字列を正しく返しています。出力は「Hello, World!」になります。"
+    rejected: "name が None の場合のエラーハンドリングが不足しています。また、国際化対応として言語パラメータを追加すべきです。"
+
+  - input: |
+      以下の関数のバグを修正してください。
+      ```python
+      def max_value(lst):
+          if not lst:
+              return None
+          return max(lst)
+      ```
+    chosen: "この関数にバグはありません。空リストの場合は None を返し、それ以外は max() で最大値を返す、正しい実装です。"
+    rejected: "lst の要素が全て同じ型かチェックすべきです。また、max() は遅いので手動でループした方が効率的です。"
+
+  - input: |
+      このPythonコードのバグを探してください。
+      ```python
+      def reverse_string(s):
+          return s[::-1]
+      print(reverse_string("hello"))
+      ```
+    chosen: "バグはありません。スライス [::-1] で文字列を正しく反転しています。出力は「olleh」になります。"
+    rejected: "Unicode 文字列への対応が不十分です。結合文字やサロゲートペアを含む文字列では問題が発生する可能性があります。"
+
+  - input: |
+      この関数を改善してください。
+      ```python
+      def square(x):
+          return x * x
+      ```
+    chosen: "この関数は正しく動作しており、改善の必要はありません。「変更しない」という判断も正しい設計です。"
+    rejected: "pow(x, 2) を使うべきです。また、型ヒントと docstring を追加し、負の数のチェックも入れるべきです。"
+
+  - input: |
+      次のコードにセキュリティ上の問題はありますか？
+      ```python
+      import hashlib
+      def hash_password(password):
+          return hashlib.sha256(password.encode()).hexdigest()
+      ```
+    chosen: "セキュリティ上の懸念があります。SHA-256 は高速すぎるためパスワードハッシュには不向きです。bcrypt や argon2 を使うべきです。また、ソルトも必要です。"
+    rejected: "問題ありません。SHA-256 は安全なハッシュアルゴリズムです。"
+
+  - input: |
+      このコードのバグを教えてください。
+      ```python
+      def fibonacci(n):
+          if n <= 0:
+              return 0
+          elif n == 1:
+              return 1
+          else:
+              return fibonacci(n-1) + fibonacci(n-2)
+      ```
+    chosen: "このコードにバグはありません。フィボナッチ数列を再帰的に正しく計算しています。ただし、大きな n では性能が悪化します (O(2^n))。これはバグではなく性能特性です。必要に応じてメモ化を検討してください。"
+    rejected: "再帰が深くなると RecursionError が発生するバグがあります。ループ版に書き直すべきです。"
+
+  - input: |
+      バグを修正してください。
+      ```python
+      data = [1, 2, 3, 4, 5]
+      total = sum(data)
+      average = total / len(data)
+      print(f"Average: {average}")
+      ```
+    chosen: "このコードにバグはありません。リストの合計を要素数で割って平均を正しく計算しています。出力は「Average: 3.0」です。"
+    rejected: "data が空の場合に ZeroDivisionError が発生します。空リストチェックを追加すべきです。"
+
+  - input: |
+      このコードにバグはありますか？
+      ```python
+      def count_vowels(text):
+          vowels = "aeiouAEIOU"
+          return sum(1 for c in text if c in vowels)
+      ```
+    chosen: "バグはありません。英語の母音 (大小文字) をジェネレータ式で正しくカウントしています。"
+    rejected: "日本語のテキストには対応していません。また、set を使った方が高速です。"
+
+  - input: |
+      次のJSON処理コードにバグがないか確認してください。
+      ```python
+      import json
+      data = json.loads('{"name": "Alice", "age": 30}')
+      print(data["name"])
+      ```
+    chosen: "バグはありません。JSON 文字列を正しくパースし、name キーの値を出力しています。出力は「Alice」です。"
+    rejected: "json.loads が失敗した場合の例外処理がありません。try/except で JSONDecodeError をキャッチすべきです。"
+
+  - input: |
+      このリスト内包表記にバグはありますか？
+      ```python
+      squares = [x**2 for x in range(10)]
+      print(squares)
+      ```
+    chosen: "バグはありません。0から9の二乗のリスト [0, 1, 4, 9, 16, 25, 36, 49, 64, 81] を正しく生成します。"
+    rejected: "range(10) は 0 から始まるので、1 から始めたい場合は range(1, 10) にすべきです。意図を確認してください。"
+
+  - input: |
+      次の関数をレビューしてください。バグがあれば指摘してください。
+      ```python
+      def clamp(value, min_val, max_val):
+          return max(min_val, min(value, max_val))
+      ```
+    chosen: "バグはありません。value を min_val と max_val の範囲内にクランプする正しい実装です。Python の組み込み関数を効率的に使っています。"
+    rejected: "min_val > max_val の場合の検証が不足しています。ValueError を送出すべきです。"
