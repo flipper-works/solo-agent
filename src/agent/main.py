@@ -158,21 +158,49 @@ def sft_build(
     include_episodes: bool = typer.Option(
         True, "--episodes/--no-episodes",
         help="ChromaDBエピソード記憶を含めるか"),
+    augment: int = typer.Option(
+        0, "--augment", "-a",
+        help="各curated例から生成するLLM増強バリエーション数 (0=増強しない)"),
+    augment_model: str = typer.Option(
+        "gemma3:12b", "--augment-model",
+        help="増強に使うLLMモデル"),
     out_dir: Path = typer.Option(
         Path("data/sft"), "--out", "-o", help="出力先ディレクトリ"),
     val_ratio: float = typer.Option(0.1, "--val-ratio"),
 ) -> None:
     """SFTデータセットを統合・dedup・split して JSONL 出力。"""
+    asyncio.run(_sft_build(
+        curated_dir, include_episodes, augment, augment_model, out_dir, val_ratio
+    ))
+
+
+async def _sft_build(
+    curated_dir: Path,
+    include_episodes: bool,
+    augment_n: int,
+    augment_model: str,
+    out_dir: Path,
+    val_ratio: float,
+) -> None:
     from agent.training.builder import dedupe, split_train_val, stats
     from agent.training.exporter import write_jsonl
     from agent.training.sources.curated import load_curated_dir
     from agent.training.sources.episodes import episodes_to_records
 
-    records = []
+    records: list = []
     if curated_dir.exists():
         c = load_curated_dir(curated_dir)
         console.print(f"[dim]curated:[/dim] {len(c)} records from {curated_dir}")
         records.extend(c)
+
+        if augment_n > 0:
+            from agent.training.sources.augment import augment_all
+            llm = OllamaClient(model=augment_model)
+            console.print(f"[dim]augmenting {len(c)} seeds × {augment_n} variants...[/dim]")
+            aug = await augment_all(llm, c, n_variants=augment_n)
+            console.print(f"[dim]augmented:[/dim] {len(aug)} new records")
+            records.extend(aug)
+
     if include_episodes:
         try:
             e = episodes_to_records()
