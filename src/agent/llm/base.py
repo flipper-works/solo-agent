@@ -10,6 +10,7 @@ from dataclasses import dataclass
 class Message:
     role: str  # "system" | "user" | "assistant"
     content: str
+    images: list[str] | None = None  # base64-encoded image data, optional
 
 
 class BaseLLM(ABC):

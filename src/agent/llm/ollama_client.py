@@ -23,9 +23,15 @@ class OllamaClient(BaseLLM):
         self.timeout = timeout
 
     def _payload(self, messages: list[Message], stream: bool, **kwargs) -> dict:
+        msg_list = []
+        for m in messages:
+            entry: dict = {"role": m.role, "content": m.content}
+            if m.images:
+                entry["images"] = m.images
+            msg_list.append(entry)
         return {
             "model": self.model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": msg_list,
             "stream": stream,
             "options": kwargs.get("options", {}),
         }
