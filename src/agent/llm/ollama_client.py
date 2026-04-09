@@ -51,12 +51,17 @@ class OllamaClient(BaseLLM):
             "num_ctx": self.DEFAULT_NUM_CTX,
         }
         opts.update(kwargs.get("options") or {})
-        return {
+        payload: dict = {
             "model": self.model,
             "messages": msg_list,
             "stream": stream,
             "options": opts,
         }
+        # Optional: enforce structured output via Ollama's `format` field.
+        # Pass format="json" to force valid JSON syntax (Gemma 3 supported).
+        if (fmt := kwargs.get("format")) is not None:
+            payload["format"] = fmt
+        return payload
 
     async def generate(self, messages: list[Message], **kwargs) -> str:
         r = await self._client.post(

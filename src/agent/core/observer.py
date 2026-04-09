@@ -56,6 +56,7 @@ class Observer:
         raw = await self.llm.generate(
             [Message(role="system", content=sys), Message(role="user", content=user)],
             options={"temperature": 0.1},
+            format="json",
         )
         # extract JSON
         start = raw.find("{")
