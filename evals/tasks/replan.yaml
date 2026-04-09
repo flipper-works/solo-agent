@@ -1,0 +1,70 @@
+# Replan評価セット — 計画変更ループの真価を測る
+#
+# 各タスクは Plan→Execute→Observe→Replan ループの「変更力」を試す。
+# 推奨実行: max_iter=5, memory無し
+
+tasks:
+  - id: rp1_ambiguous_error
+    category: replan
+    modes: [run]
+    prompt: |
+      /tmp/rp1.py に以下を書いて実行してください:
+        import nonexistent_module_xyz
+        print('hi')
+      エラーが出たら、モジュール名が架空であることを認識して、import文を削除した版に修正して再実行してください。
+    expected: "ModuleNotFoundError認識→import削除→再実行成功。verdict=done。"
+
+  - id: rp2_approach_pivot
+    category: replan
+    modes: [run]
+    prompt: "/tmp/rp2_target.bin (存在しないファイル) を読み込んで内容を表示してください。読めない場合は、代わりに /tmp/rp2_fallback.txt を新規作成して『fallback content』と書き込み、そちらを読み込んで表示してください。"
+    expected: "FileNotFound→fallback作成→読み込み成功。verdict=done。"
+
+  - id: rp3_partial_success
+    category: replan
+    modes: [run]
+    prompt: |
+      次の3つのファイルを順に作成してください:
+        1. /tmp/rp3_a.txt → "AAA"
+        2. /tmp/rp3_b.txt → "BBB"
+        3. /tmp/rp3_subdir_xyz/rp3_c.txt → "CCC"  (ディレクトリがなくて失敗するはず)
+      3番目が失敗したら、必要なディレクトリを mkdir -p で作成してから再実行してください。
+      既に成功した1, 2は再作成不要です。
+    expected: "1,2成功→3失敗→mkdir→3再試行成功。1,2の重複作成があってもverdict=doneなら可。理想は重複なし。"
+
+  - id: rp4_tool_pivot
+    category: replan
+    modes: [run]
+    prompt: "/tmp/rp4.py に Python で円周率を100桁計算するコードを書いて実行してください。math.pi では15桁程度しか精度がないので、decimal モジュールを使う必要があります。最初に math.pi で書いて精度不足だと気づいたら decimal で書き直すこと。"
+    expected: "math.pi→精度不足認識→decimal書き直し→100桁出力。verdict=done。"
+
+  - id: rp5_late_constraint
+    category: replan
+    modes: [run]
+    prompt: "/tmp/rp5.txt に今の日時を書き込んでください。ただし、shell_runner ツールは使わず、code_executor のみで実装してください。"
+    expected: "code_executorのみ使用、shell_runnerの誤使用なし。verdict=done。"
+
+  - id: rp6_give_up
+    category: replan
+    modes: [run]
+    prompt: "https://this-host-definitely-does-not-exist-12345.invalid からデータをダウンロードして /tmp/rp6.txt に保存してください。3回試して無理ならその旨を報告してください。"
+    expected: "DNS解決失敗→数回試行→fail判定 or doneでエラー報告ファイル作成。無限ループしないこと。"
+
+  - id: rp7_no_repeat
+    category: replan
+    modes: [run]
+    prompt: |
+      /tmp/rp7.py に以下を書いて実行してください:
+        print(undefined_variable)
+      NameError が出たら、原因を分析して修正してください。
+      重要: 同じ失敗するコードを単に再実行するのは禁止です。
+    expected: "NameError認識→修正 (定義追加 or 文字列化など)→成功。同じ失敗の繰り返しがないこと。"
+
+  - id: rp8_strategy_change
+    category: replan
+    modes: [run]
+    prompt: |
+      /tmp/rp8_dir をクリーンに作って、その中に sample1.txt (中身: foo), sample2.txt (中身: bar), sample3.txt (中身: baz) を作成してください。
+      その後、/tmp/rp8_dir 内の .txt ファイルを全て検索し、その内容を1つのファイル /tmp/rp8_combined.txt にまとめてください。
+      最初は shell の cat で試して、もし上手くいかなかったら code_executor で Python を使う方針に切り替えてください。
+    expected: "ディレクトリ・ファイル準備→cat or python で結合。verdict=done。"
