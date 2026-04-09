@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from agent.core.executor import ExecutionTrace, Executor
 from agent.core.observer import Observation, Observer, Verdict
 from agent.core.planner import Planner
+from agent.core.verifier import LLMVerifier
 from agent.infra.logger import get_logger
 from agent.llm.base import BaseLLM
 from agent.memory.manager import MemoryManager
@@ -35,7 +36,7 @@ class AgentSession:
         self.max_iterations = max_iterations
         self.planner = Planner(llm, tools)
         self.executor = Executor(tools)
-        self.observer = Observer(llm)
+        self.observer = Observer(LLMVerifier(llm))
         self.memory = memory
 
     async def run(self, task: str) -> SessionResult:
