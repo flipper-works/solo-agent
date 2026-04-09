@@ -41,9 +41,47 @@ class WhisperAdapter(BaseInputAdapter):
         self.language = language
         self._model: Any = None  # lazy
 
+    def _ensure_cuda_libs(self) -> None:
+        """Add bundled nvidia cublas/cudnn .so paths so CTranslate2 finds them.
+
+        faster-whisper relies on libcublas.so.12 / libcudnn.so.9 which the
+        nvidia-cublas-cu12 / nvidia-cudnn-cu12 wheels ship inside the venv.
+        Without LD_LIBRARY_PATH set up, CTranslate2 cannot dlopen them.
+        """
+        import os
+        import sys
+
+        candidates = []
+        for sub in ("nvidia/cublas/lib", "nvidia/cudnn/lib"):
+            for sp in sys.path:
+                p = os.path.join(sp, sub)
+                if os.path.isdir(p):
+                    candidates.append(p)
+                    break
+        if not candidates:
+            return
+        existing = os.environ.get("LD_LIBRARY_PATH", "")
+        new = ":".join(candidates + ([existing] if existing else []))
+        os.environ["LD_LIBRARY_PATH"] = new
+        # Best-effort dlopen so already-linked process can find them
+        try:
+            import ctypes
+
+            for d in candidates:
+                for fname in os.listdir(d):
+                    if fname.startswith("lib") and ".so" in fname:
+                        try:
+                            ctypes.CDLL(os.path.join(d, fname), mode=ctypes.RTLD_GLOBAL)
+                        except OSError:
+                            pass
+        except Exception:
+            pass
+
     def _ensure_model(self) -> None:
         if self._model is not None:
             return
+        if self.device in ("cuda", "auto"):
+            self._ensure_cuda_libs()
         # Lazy import to keep cold-start fast for users not using audio
         from faster_whisper import WhisperModel
 
