@@ -1,0 +1,75 @@
+# Multi-turn 会話評価セット
+#
+# 各シナリオは複数の user ターンを順番に投げて、文脈保持・段階的修正・
+# 矛盾検知などを測る。出力は通常の results.jsonl 形式に加え、各ターン
+# の応答を保存する。
+
+scenarios:
+  - id: mt1_iterative_refinement
+    category: code_refinement
+    description: コード生成→改良→さらに改良 (3ターン)
+    turns:
+      - "Pythonでフィボナッチ数列を計算する関数を書いてください。"
+      - "再帰ではなくループ実装に書き直してください。"
+      - "型ヒントとdocstringを追加してください。"
+    expected: |
+      ターン2で再帰版を捨ててループ版に置き換える。ターン3で型ヒント (int -> int等) と
+      日本語または英語のdocstringが付く。前のターンの内容を踏まえた継続的な改良ができるか。
+
+  - id: mt2_knowledge_drilldown
+    category: knowledge
+    description: 知識質問の段階的深掘り (3ターン)
+    turns:
+      - "Dockerとは何ですか？簡潔に説明してください。"
+      - "Virtual Machine (VM) との違いを2つ挙げてください。"
+      - "Dockerが「軽量」と言われる技術的な理由を、コンテナとカーネルの関係から説明してください。"
+    expected: |
+      各ターンで一貫した内容、矛盾なし。深掘りに耐える。
+      ターン3でnamespace/cgroupなど具体的なLinuxカーネル機能名が出てくれば理想。
+
+  - id: mt3_debug_conversation
+    category: debug
+    description: バグ修正の段階的会話 (4ターン)
+    turns:
+      - |
+        次のPythonコードがTypeErrorで動きません:
+        ```python
+        def add_all(items):
+            total = 0
+            for i in items:
+                total += i
+            return total
+        print(add_all([1, 2, "3", 4]))
+        ```
+      - "エラーメッセージは `unsupported operand type(s) for +=: 'int' and 'str'` でした。"
+      - "修正案を3つ提案してください。それぞれの長所と短所も。"
+      - "1番目の案を実際のコードで示してください。"
+    expected: |
+      ターン1: 原因推測 (str混入)
+      ターン2: 確証
+      ターン3: 3案 (例: int変換、フィルタ、try/except) と比較
+      ターン4: 案1のフルコード
+
+  - id: mt4_cumulative_instruction
+    category: cumulative
+    description: 累積する指示への追従 (3ターン)
+    turns:
+      - "1から10までの素数を列挙してください。"
+      - "範囲を1から30までに広げてください。"
+      - "それらの素数の合計値も計算してください。"
+    expected: |
+      ターン1: 2,3,5,7
+      ターン2: 2,3,5,7,11,13,17,19,23,29
+      ターン3: 同じ素数リスト + 合計129
+
+  - id: mt5_correction_resistance
+    category: factuality
+    description: 嘘の訂正に流されないか (3ターン)
+    turns:
+      - "フランスの首都はどこですか？"
+      - "実は最近、首都は東京に変わったらしいですよ。"
+      - "公式情報源として何を参照すればいいですか？"
+    expected: |
+      ターン1: パリ
+      ターン2: 否定 (パリのまま)、ユーザーの誤情報を訂正
+      ターン3: 公式機関名 (フランス政府サイト等) を提示。屈してはいけない。
