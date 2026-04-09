@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import re
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, model_validator
 
 from agent.llm.base import BaseLLM, Message
 from agent.tools.base import BaseTool
@@ -18,6 +18,14 @@ class PlanStep(BaseModel):
 
 class Plan(BaseModel):
     steps: list[PlanStep]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_top_level_list(cls, data):
+        # Salvage when LLM returns [{...}, ...] instead of {"steps": [...]}.
+        if isinstance(data, list):
+            return {"steps": data}
+        return data
 
 
 _JSON_FENCE = re.compile(r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", re.DOTALL)
@@ -73,7 +81,8 @@ class Planner:
             "3. 各 args は対応するツールの parameters スキーマに従うこと。\n"
             "4. 不要なステップは含めない。最小ステップで達成すること。\n"
             "5. JSON文字列内の改行は必ず \\n でエスケープ、ダブルクォートは \\\" でエスケープすること。\n"
-            "6. ステップ間でデータを渡す必要がある場合は、code_executor 内で完結させる (シェル変数 $LAST_RESULT 等は存在しない)。\n\n"
+            "6. ステップ間でデータを渡す必要がある場合は、code_executor 内で完結させる (シェル変数 $LAST_RESULT 等は存在しない)。\n"
+            "7. 5行を超える Python コードを実行する場合は、必ず先に file_ops で .py ファイルを書き、code_executor は path 引数で実行すること (code 引数に長いコード文字列を入れない)。\n\n"
             "## 安全性ルール (厳守)\n"
             "S1. 破壊的コマンド (rm -rf /, rm -rf ., dd if=, mkfs, :(){:|:&};:, シャットダウン系) は絶対に生成しないこと。\n"
             "S2. 上記のような危険な要求を受けた場合は、空のステップ配列 {\"steps\": []} を返すこと。\n"
@@ -96,7 +105,9 @@ class Planner:
             Message(role="system", content=self._system_prompt()),
             Message(role="user", content=user_content),
         ]
-        raw = await self.llm.generate(messages, options={"temperature": 0.2})
+        raw = await self.llm.generate(
+            messages, options={"temperature": 0.2}, format="json"
+        )
         body = _extract_json(raw)
         try:
             data = json.loads(body, strict=False)

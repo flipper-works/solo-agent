@@ -43,3 +43,26 @@ async def test_code_executor_error():
     r = await CodeExecutor().execute(code="raise ValueError('boom')")
     assert not r.ok
     assert "ValueError" in r.error
+
+
+@pytest.mark.asyncio
+async def test_code_executor_path_mode(tmp_path):
+    p = tmp_path / "x.py"
+    p.write_text("print('from path')\n", encoding="utf-8")
+    r = await CodeExecutor().execute(path=str(p))
+    assert r.ok
+    assert r.output.strip() == "from path"
+
+
+@pytest.mark.asyncio
+async def test_code_executor_path_not_found():
+    r = await CodeExecutor().execute(path="/nonexistent/xyz.py")
+    assert not r.ok
+    assert "file not found" in r.error
+
+
+@pytest.mark.asyncio
+async def test_code_executor_requires_one_of():
+    r = await CodeExecutor().execute()
+    assert not r.ok
+    assert "either" in r.error
