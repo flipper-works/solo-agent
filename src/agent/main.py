@@ -150,6 +150,22 @@ async def _vision(image: Path, model: str, prompt: str) -> None:
 
 
 @app.command()
+def eval(
+    tasks: Path = typer.Option(
+        Path("evals/tasks/baseline.yaml"), "--tasks", "-t", help="タスク定義YAML"
+    ),
+    out: Path = typer.Option(Path("evals/results"), "--out", "-o"),
+    model: str = typer.Option("gemma3:12b", "--model", "-m"),
+    max_iter: int = typer.Option(3, "--max-iter"),
+) -> None:
+    """ベースライン評価ハーネスを実行 (FT前の弱点抽出用)。"""
+    from agent.eval.runner import run_eval
+
+    out_path = asyncio.run(run_eval(tasks, out, model, max_iter))
+    console.print(f"\n[bold green]done:[/bold green] {out_path}")
+
+
+@app.command()
 def stats() -> None:
     """メモリ層の統計を表示。"""
     mm = MemoryManager()
