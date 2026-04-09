@@ -12,6 +12,7 @@ dependencies = [
     "chromadb>=1.5.7",
     "faster-whisper>=1.2.1",
     "httpx>=0.28.1",
+    "mcp>=1.27.0",
     "nvidia-cublas-cu12>=12.9.2.10",
     "nvidia-cudnn-cu12>=9.20.0.48",
     "pydantic>=2.12.5",
@@ -20,7 +21,6 @@ dependencies = [
     "rich>=14.3.3",
     "structlog>=25.5.0",
     "typer>=0.24.1",
-    "unsloth[cu124-torch260]>=2025.2.2",
 ]
 
 [project.scripts]

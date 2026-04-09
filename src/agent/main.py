@@ -19,6 +19,7 @@ from agent.llm.ollama_client import OllamaClient
 from agent.memory.manager import MemoryManager
 from agent.tools.code_executor import CodeExecutor
 from agent.tools.file_ops import FileOps
+from agent.tools.memory_search import MemorySearchTool
 from agent.tools.shell_runner import ShellRunner
 
 app = typer.Typer(help="Local LLM Agent CLI")
@@ -112,8 +113,8 @@ def run(
 async def _run(task: str, model: str, max_iter: int, no_memory: bool) -> None:
     configure_logging(level="INFO", log_file=Path("logs/agent.jsonl"))
     llm = OllamaClient(model=model)
-    tools = [ShellRunner(), FileOps(), CodeExecutor()]
     memory = None if no_memory else MemoryManager(llm_for_summary=llm)
+    tools = [ShellRunner(), FileOps(), CodeExecutor(), MemorySearchTool(memory)]
     session = AgentSession(llm, tools, max_iterations=max_iter, memory=memory)
     console.print(f"[bold cyan]task:[/bold cyan] {task}")
     result = await session.run(task)
@@ -340,6 +341,14 @@ async def _transcribe(
         console.print(f"[green]wrote → {output}[/green]")
     else:
         console.print(text)
+
+
+@app.command("mcp-serve")
+def mcp_serve() -> None:
+    """MCP サーバーを起動 (stdio transport)。Claude Code / VS Code 等から接続。"""
+    from agent.mcp_server import main as mcp_main
+
+    asyncio.run(mcp_main())
 
 
 @app.command()
