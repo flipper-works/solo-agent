@@ -150,6 +150,56 @@ async def _vision(image: Path, model: str, prompt: str) -> None:
     console.print(text)
 
 
+@app.command("sft-build")
+def sft_build(
+    curated_dir: Path = typer.Option(
+        Path("evals/sft_curated"), "--curated", "-c",
+        help="手動キュレーションYAMLのディレクトリ"),
+    include_episodes: bool = typer.Option(
+        True, "--episodes/--no-episodes",
+        help="ChromaDBエピソード記憶を含めるか"),
+    out_dir: Path = typer.Option(
+        Path("data/sft"), "--out", "-o", help="出力先ディレクトリ"),
+    val_ratio: float = typer.Option(0.1, "--val-ratio"),
+) -> None:
+    """SFTデータセットを統合・dedup・split して JSONL 出力。"""
+    from agent.training.builder import dedupe, split_train_val, stats
+    from agent.training.exporter import write_jsonl
+    from agent.training.sources.curated import load_curated_dir
+    from agent.training.sources.episodes import episodes_to_records
+
+    records = []
+    if curated_dir.exists():
+        c = load_curated_dir(curated_dir)
+        console.print(f"[dim]curated:[/dim] {len(c)} records from {curated_dir}")
+        records.extend(c)
+    if include_episodes:
+        try:
+            e = episodes_to_records()
+            console.print(f"[dim]episodes:[/dim] {len(e)} records from data/chroma")
+            records.extend(e)
+        except Exception as ex:
+            console.print(f"[yellow]episodes skipped:[/yellow] {ex}")
+
+    if not records:
+        console.print("[red]no records collected[/red]")
+        raise typer.Exit(1)
+
+    deduped, removed = dedupe(records)
+    train, val = split_train_val(deduped, val_ratio=val_ratio)
+    n_train = write_jsonl(train, out_dir / "train.jsonl")
+    n_val = write_jsonl(val, out_dir / "val.jsonl") if val else 0
+
+    s = stats(deduped, dup_removed=removed)
+    console.print(f"\n[bold green]done[/bold green]")
+    console.print(f"  total deduped: {s.total} (removed {s.duplicates_removed} dups)")
+    console.print(f"  by source:     {s.by_source}")
+    console.print(f"  by tag:        {s.by_tag}")
+    console.print(f"  train: {n_train}  → {out_dir / 'train.jsonl'}")
+    if n_val:
+        console.print(f"  val:   {n_val}  → {out_dir / 'val.jsonl'}")
+
+
 @app.command("eval-grade")
 def eval_grade(
     results: Path = typer.Argument(..., help="results.jsonl パス"),
