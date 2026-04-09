@@ -187,19 +187,45 @@ def transcribe(
     model_size: str = typer.Option("small", "--model-size", "-s",
         help="tiny / base / small / medium / large-v3"),
     language: str = typer.Option("ja", "--lang", "-l", help="言語コード (ja/en/auto等、autoは空文字)"),
+    device: str = typer.Option("cpu", "--device", "-d",
+        help="cpu / cuda (CUDA対応GPUがあれば cuda 推奨、約10〜30倍速)"),
+    compute_type: str = typer.Option("", "--compute-type", "-c",
+        help="int8 (cpu) / float16 (cuda) / float32。空なら device に応じて自動"),
+    output: Path = typer.Option(None, "--output", "-o",
+        help="出力ファイル (省略時は標準出力)"),
 ) -> None:
     """音声ファイルを Whisper で文字起こし。"""
     if not audio.exists():
         console.print(f"[red]ファイルが見つかりません:[/red] {audio}")
         raise typer.Exit(1)
-    asyncio.run(_transcribe(audio, model_size, language or None))
+    if not compute_type:
+        compute_type = "float16" if device == "cuda" else "int8"
+    asyncio.run(_transcribe(audio, model_size, language or None, device, compute_type, output))
 
 
-async def _transcribe(audio: Path, model_size: str, language: str | None) -> None:
-    adapter = WhisperAdapter(model_size=model_size, language=language)
-    console.print(f"[dim]>>> whisper:{model_size} reading {audio.name}[/dim]")
+async def _transcribe(
+    audio: Path,
+    model_size: str,
+    language: str | None,
+    device: str,
+    compute_type: str,
+    output: Path | None,
+) -> None:
+    adapter = WhisperAdapter(
+        model_size=model_size, language=language, device=device, compute_type=compute_type
+    )
+    console.print(f"[dim]>>> whisper:{model_size} on {device} reading {audio.name}[/dim]")
+    import time
+    t0 = time.time()
     text = await adapter.to_text(audio)
-    console.print(text)
+    elapsed = time.time() - t0
+    console.print(f"[dim]({len(text)} chars in {elapsed:.1f}s)[/dim]")
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(text, encoding="utf-8")
+        console.print(f"[green]wrote → {output}[/green]")
+    else:
+        console.print(text)
 
 
 @app.command()
