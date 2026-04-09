@@ -13,6 +13,7 @@ from pathlib import Path
 from agent.core.session import AgentSession
 from agent.infra.logger import configure_logging
 from agent.input.vision_adapter import VisionAdapter
+from agent.input.whisper_adapter import WhisperAdapter
 from agent.llm.base import Message
 from agent.llm.ollama_client import OllamaClient
 from agent.memory.manager import MemoryManager
@@ -178,6 +179,27 @@ def eval(
 
     out_path = asyncio.run(run_eval(tasks, out, model, max_iter))
     console.print(f"\n[bold green]done:[/bold green] {out_path}")
+
+
+@app.command()
+def transcribe(
+    audio: Path = typer.Argument(..., help="音声ファイルのパス (.wav/.mp3 等)"),
+    model_size: str = typer.Option("small", "--model-size", "-s",
+        help="tiny / base / small / medium / large-v3"),
+    language: str = typer.Option("ja", "--lang", "-l", help="言語コード (ja/en/auto等、autoは空文字)"),
+) -> None:
+    """音声ファイルを Whisper で文字起こし。"""
+    if not audio.exists():
+        console.print(f"[red]ファイルが見つかりません:[/red] {audio}")
+        raise typer.Exit(1)
+    asyncio.run(_transcribe(audio, model_size, language or None))
+
+
+async def _transcribe(audio: Path, model_size: str, language: str | None) -> None:
+    adapter = WhisperAdapter(model_size=model_size, language=language)
+    console.print(f"[dim]>>> whisper:{model_size} reading {audio.name}[/dim]")
+    text = await adapter.to_text(audio)
+    console.print(text)
 
 
 @app.command()
