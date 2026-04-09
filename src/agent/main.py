@@ -149,6 +149,21 @@ async def _vision(image: Path, model: str, prompt: str) -> None:
     console.print(text)
 
 
+@app.command("eval-chat")
+def eval_chat(
+    scenarios: Path = typer.Option(
+        Path("evals/tasks/multiturn.yaml"), "--scenarios", "-s"
+    ),
+    out: Path = typer.Option(Path("evals/results"), "--out", "-o"),
+    model: str = typer.Option("gemma3:12b", "--model", "-m"),
+) -> None:
+    """Multi-turn 会話評価を実行 (`agent chat` の品質測定)。"""
+    from agent.eval.multiturn import run_multiturn_eval
+
+    out_path = asyncio.run(run_multiturn_eval(scenarios, out, model))
+    console.print(f"\n[bold green]done:[/bold green] {out_path}")
+
+
 @app.command()
 def eval(
     tasks: Path = typer.Option(
