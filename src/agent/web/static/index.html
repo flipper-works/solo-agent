@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>solo-agent</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; }
+  header { background: #16213e; padding: 12px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #0f3460; }
+  header h1 { font-size: 18px; color: #e94560; }
+  header select { background: #0f3460; color: #e0e0e0; border: 1px solid #e94560; padding: 4px 8px; border-radius: 4px; }
+  .tabs { display: flex; background: #16213e; border-bottom: 1px solid #0f3460; }
+  .tab { padding: 8px 20px; cursor: pointer; color: #888; border-bottom: 2px solid transparent; }
+  .tab.active { color: #e94560; border-bottom-color: #e94560; }
+  .panel { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+  .panel.active { display: flex; }
+  .messages { flex: 1; overflow-y: auto; padding: 16px; }
+  .msg { margin-bottom: 12px; max-width: 80%; padding: 10px 14px; border-radius: 8px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+  .msg.user { background: #0f3460; margin-left: auto; }
+  .msg.assistant { background: #1a1a2e; border: 1px solid #333; }
+  .msg.system { background: #2a1a1a; border: 1px solid #e94560; font-size: 13px; }
+  .input-bar { display: flex; padding: 12px; background: #16213e; border-top: 1px solid #0f3460; gap: 8px; }
+  .input-bar input, .input-bar textarea { flex: 1; background: #0f3460; color: #e0e0e0; border: 1px solid #333; padding: 10px; border-radius: 6px; font-size: 14px; resize: none; }
+  .input-bar button { background: #e94560; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+  .input-bar button:hover { background: #c73e54; }
+  .input-bar button:disabled { background: #555; cursor: not-allowed; }
+  .trace { font-family: monospace; font-size: 13px; }
+  .trace .ok { color: #4caf50; }
+  .trace .err { color: #e94560; }
+  .status { padding: 4px 12px; font-size: 12px; color: #888; }
+  pre { background: #111; padding: 8px; border-radius: 4px; overflow-x: auto; }
+  code { font-family: 'Fira Code', monospace; }
+</style>
+</head>
+<body>
+<header>
+  <h1>solo-agent</h1>
+  <select id="model">
+    <option value="gemma3-sp">gemma3-sp (12B)</option>
+    <option value="swallow-sp">swallow-sp (8B)</option>
+    <option value="swallow-dpo">swallow-dpo (8B+DPO)</option>
+    <option value="llama31-sp">llama31-sp (8B)</option>
+  </select>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-panel="chat-panel">Chat</div>
+  <div class="tab" data-panel="run-panel">Run</div>
+  <div class="tab" data-panel="ask-panel">Ask</div>
+</div>
+
+<!-- Chat Panel -->
+<div id="chat-panel" class="panel active">
+  <div class="messages" id="chat-messages"></div>
+  <div class="status" id="chat-status"></div>
+  <div class="input-bar">
+    <input id="chat-input" placeholder="メッセージを入力..." autofocus>
+    <button id="chat-send">送信</button>
+  </div>
+</div>
+
+<!-- Run Panel -->
+<div id="run-panel" class="panel">
+  <div class="messages" id="run-messages"></div>
+  <div class="status" id="run-status"></div>
+  <div class="input-bar">
+    <input id="run-input" placeholder="タスクを入力 (例: /tmp/hello.py にHello Worldを書いて実行)">
+    <button id="run-send">実行</button>
+  </div>
+</div>
+
+<!-- Ask Panel -->
+<div id="ask-panel" class="panel">
+  <div class="messages" id="ask-messages"></div>
+  <div class="input-bar">
+    <input id="ask-input" placeholder="質問を入力...">
+    <button id="ask-send">質問</button>
+  </div>
+</div>
+
+<script>
+// --- Tabs ---
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.panel).classList.add('active');
+  });
+});
+
+function addMsg(container, role, text) {
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.textContent = text;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+// --- Chat (WebSocket) ---
+let ws = null;
+let currentAssistantMsg = null;
+
+function connectWS() {
+  const model = document.getElementById('model').value;
+  ws = new WebSocket(`ws://${location.host}/ws/chat`);
+  ws.onopen = () => document.getElementById('chat-status').textContent = 'Connected';
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'token') {
+      if (!currentAssistantMsg) {
+        currentAssistantMsg = addMsg(document.getElementById('chat-messages'), 'assistant', '');
+      }
+      currentAssistantMsg.textContent += data.content;
+      document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+    } else if (data.type === 'done') {
+      currentAssistantMsg = null;
+      document.getElementById('chat-send').disabled = false;
+    }
+  };
+  ws.onclose = () => {
+    document.getElementById('chat-status').textContent = 'Disconnected';
+    setTimeout(connectWS, 2000);
+  };
+}
+connectWS();
+
+document.getElementById('chat-send').addEventListener('click', sendChat);
+document.getElementById('chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+
+function sendChat() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+  addMsg(document.getElementById('chat-messages'), 'user', text);
+  ws.send(JSON.stringify({ content: text, model: document.getElementById('model').value }));
+  input.value = '';
+  document.getElementById('chat-send').disabled = true;
+}
+
+// --- Run ---
+document.getElementById('run-send').addEventListener('click', runTask);
+document.getElementById('run-input').addEventListener('keydown', e => { if (e.key === 'Enter') runTask(); });
+
+async function runTask() {
+  const input = document.getElementById('run-input');
+  const task = input.value.trim();
+  if (!task) return;
+  const msgs = document.getElementById('run-messages');
+  addMsg(msgs, 'user', task);
+  document.getElementById('run-status').textContent = 'Running...';
+  document.getElementById('run-send').disabled = true;
+  input.value = '';
+
+  try {
+    const res = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task, model: document.getElementById('model').value }),
+    });
+    const data = await res.json();
+    let traceText = `verdict: ${data.verdict} (${data.iterations} iterations)\nsummary: ${data.summary}\n\n--- trace ---\n`;
+    data.trace.forEach((t, i) => {
+      const mark = t.ok ? 'OK' : 'ERR';
+      traceText += `[${i+1}] ${mark} ${t.tool} ${JSON.stringify(t.args).substring(0, 100)}\n`;
+      if (t.output) traceText += `  out: ${t.output.substring(0, 200)}\n`;
+      if (t.error) traceText += `  err: ${t.error.substring(0, 200)}\n`;
+    });
+    addMsg(msgs, data.verdict === 'done' ? 'assistant' : 'system', traceText);
+  } catch (e) {
+    addMsg(msgs, 'system', `Error: ${e.message}`);
+  }
+  document.getElementById('run-status').textContent = '';
+  document.getElementById('run-send').disabled = false;
+}
+
+// --- Ask ---
+document.getElementById('ask-send').addEventListener('click', askQuestion);
+document.getElementById('ask-input').addEventListener('keydown', e => { if (e.key === 'Enter') askQuestion(); });
+
+async function askQuestion() {
+  const input = document.getElementById('ask-input');
+  const prompt = input.value.trim();
+  if (!prompt) return;
+  const msgs = document.getElementById('ask-messages');
+  addMsg(msgs, 'user', prompt);
+  document.getElementById('ask-send').disabled = true;
+  input.value = '';
+
+  try {
+    const res = await fetch('/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, model: document.getElementById('model').value }),
+    });
+    const data = await res.json();
+    addMsg(msgs, 'assistant', data.response);
+  } catch (e) {
+    addMsg(msgs, 'system', `Error: ${e.message}`);
+  }
+  document.getElementById('ask-send').disabled = false;
+}
+</script>
+</body>
+</html>
