@@ -343,6 +343,19 @@ async def _transcribe(
         console.print(text)
 
 
+@app.command()
+def web(
+    host: str = typer.Option("0.0.0.0", "--host"),
+    port: int = typer.Option(8000, "--port", "-p"),
+) -> None:
+    """Web UI を起動 (ブラウザで操作)。"""
+    import uvicorn
+    from agent.web.app import app as web_app
+
+    console.print(f"[bold cyan]solo-agent Web UI[/bold cyan] → http://localhost:{port}")
+    uvicorn.run(web_app, host=host, port=port, log_level="info")
+
+
 @app.command("mcp-serve")
 def mcp_serve() -> None:
     """MCP サーバーを起動 (stdio transport)。Claude Code / VS Code 等から接続。"""
