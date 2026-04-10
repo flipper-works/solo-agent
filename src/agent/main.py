@@ -76,9 +76,12 @@ def chat(
 
 
 async def _chat(model: str, system: str) -> None:
+    from agent.core.chat_agent import ChatAgent
+
     llm = OllamaClient(model=model)
-    history: list[Message] = [Message(role="system", content=system)]
-    console.print(f"[bold cyan]chat[/bold cyan] model={model}  ([dim]exit で終了[/dim])")
+    tools = [ShellRunner(), FileOps(), CodeExecutor(), MemorySearchTool()]
+    agent = ChatAgent(llm, tools, system=system)
+    console.print(f"[bold cyan]chat[/bold cyan] model={model}  ([dim]exit で終了 / ツール自動実行対応[/dim])")
     while True:
         try:
             user = console.input("[bold green]you>[/bold green] ")
@@ -89,14 +92,10 @@ async def _chat(model: str, system: str) -> None:
             return
         if not user.strip():
             continue
-        history.append(Message(role="user", content=user))
-        console.print("[bold magenta]llm>[/bold magenta] ", end="")
-        buf = ""
-        async for tok in llm.stream(history):
-            buf += tok
-            console.print(tok, end="")
+        console.print("[bold magenta]agent>[/bold magenta] ", end="")
+        async for chunk in agent.send_stream(user):
+            console.print(chunk, end="")
         console.print()
-        history.append(Message(role="assistant", content=buf))
 
 
 @app.command()
