@@ -92,33 +92,26 @@ async def api_run(req: RunRequest):
 async def ws_chat(websocket: WebSocket):
     await websocket.accept()
     model = "gemma3-sp"
-    system = (
-        "あなたは親切で正直なローカルLLMアシスタントです。日本語で簡潔に応答してください。"
-        "コードレビューで問題がなければ「問題ありません」と正直に答えてください。"
-        "知らないことは知らないと素直に答えてください。"
-    )
-    history: list[Message] = [Message(role="system", content=system)]
+    from agent.core.chat_agent import ChatAgent
     llm = OllamaClient(model=model)
+    tools = [ShellRunner(), FileOps(), CodeExecutor(), MemorySearchTool()]
+    agent = ChatAgent(llm, tools)
 
     try:
         while True:
             data = await websocket.receive_text()
             msg = json.loads(data)
             user_text = msg.get("content", "")
-            if msg.get("model"):
+            if msg.get("model") and msg["model"] != model:
                 model = msg["model"]
                 llm = OllamaClient(model=model)
+                tools = [ShellRunner(), FileOps(), CodeExecutor(), MemorySearchTool()]
+                agent = ChatAgent(llm, tools)
 
-            history.append(Message(role="user", content=user_text))
+            async for chunk in agent.send_stream(user_text):
+                await websocket.send_text(json.dumps({"type": "token", "content": chunk}))
 
-            # Stream response
-            buf = ""
-            async for token in llm.stream(history):
-                buf += token
-                await websocket.send_text(json.dumps({"type": "token", "content": token}))
-
-            history.append(Message(role="assistant", content=buf))
-            await websocket.send_text(json.dumps({"type": "done", "content": buf}))
+            await websocket.send_text(json.dumps({"type": "done", "content": ""}))
     except WebSocketDisconnect:
         pass
 
