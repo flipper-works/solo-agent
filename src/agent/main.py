@@ -230,6 +230,21 @@ async def _sft_build(
         console.print(f"  val:   {n_val}  → {out_dir / 'val.jsonl'}")
 
 
+@app.command("eval-agent")
+def eval_agent(
+    tasks: Path = typer.Option(
+        Path("evals/tasks/chat_agent.yaml"), "--tasks", "-t"
+    ),
+    out: Path = typer.Option(Path("evals/results"), "--out", "-o"),
+    model: str = typer.Option("gemma3-sp", "--model", "-m"),
+) -> None:
+    """ChatAgent (ReAct) の100パターン評価を実行。"""
+    from agent.eval.chat_agent_eval import run_chat_agent_eval
+
+    out_path = asyncio.run(run_chat_agent_eval(tasks, out, model))
+    console.print(f"\n[bold green]done:[/bold green] {out_path}")
+
+
 @app.command("eval-grade")
 def eval_grade(
     results: Path = typer.Argument(..., help="results.jsonl パス"),
