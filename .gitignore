@@ -51,7 +51,7 @@ tmp/
 chroma_db/
 
 # --- IDE / OS ---
-.vscode/
+.vscode/settings.json
 .idea/
 *.swp
 *.swo
@@ -59,4 +59,5 @@ chroma_db/
 Thumbs.db
 
 # --- Tool-local ---
-.claude/
+.claude/*
+!.claude/claude-code-mcp.json

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "solo-agent": {
+      "command": "uv",
+      "args": ["run", "agent", "mcp-serve"],
+      "cwd": "/home/aoish/projects/local-llm"
+    }
+  }
+}

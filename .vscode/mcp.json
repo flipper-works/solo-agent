@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "solo-agent": {
+      "command": "uv",
+      "args": ["run", "agent", "mcp-serve"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}
